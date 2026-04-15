@@ -2,7 +2,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FinaTrack Pro - Облачный учет</title>
+    <title>FinaTrack Pro - Универсальная версия</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -20,8 +20,6 @@
             background-color: var(--bg-main); 
             color: #ffffff; 
             -webkit-tap-highlight-color: transparent; 
-            margin: 0;
-            padding: 0;
         }
         .tab-active { 
             background-color: #262933; 
@@ -32,22 +30,17 @@
             background: var(--bg-card); 
             border: 1px solid rgba(255,255,255,0.05); 
         }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-        
         @media print {
             body { background: white; color: black; padding: 0; }
             .no-print { display: none !important; }
             .glass-card { border: none; box-shadow: none; background: white; color: black; }
-            .print-only { display: block !important; }
         }
-        .print-only { display: none; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body class="min-h-screen pb-10">
 
-    <div id="app-container" class="max-w-6xl mx-auto px-4 pt-6 opacity-0 transition-opacity duration-500">
+    <div id="app-container" class="max-w-6xl mx-auto px-4 pt-6">
         <!-- шапка -->
         <header class="flex flex-wrap justify-between items-center mb-8 gap-4 no-print">
             <div class="flex items-center gap-4">
@@ -56,7 +49,7 @@
                 </span>
                 <div id="sync-indicator" class="flex items-center gap-2 px-3 py-1 bg-slate-800/50 rounded-full text-[10px] font-bold uppercase tracking-wider text-slate-500">
                     <div id="sync-dot" class="w-1.5 h-1.5 rounded-full bg-slate-600 animate-pulse"></div>
-                    <span id="sync-text">инициализация...</span>
+                    <span id="sync-text">подключение...</span>
                 </div>
             </div>
             <div class="flex items-center gap-2">
@@ -67,11 +60,7 @@
                 </label>
                 <button onclick="window.exportToExcel()" class="p-2 md:px-4 md:py-2 bg-slate-800/50 hover:bg-slate-800 rounded-full flex items-center gap-2 transition-colors">
                     <i data-lucide="file-spreadsheet" class="w-4 h-4 text-green-500"></i>
-                    <span class="hidden sm:inline text-xs">Excel</span>
-                </button>
-                <button onclick="window.print()" class="p-2 md:px-4 md:py-2 bg-slate-800/50 hover:bg-slate-800 rounded-full flex items-center gap-2 transition-colors">
-                    <i data-lucide="printer" class="w-4 h-4 text-blue-400"></i>
-                    <span class="hidden sm:inline text-xs">печать</span>
+                    <span class="hidden sm:inline text-xs text-white">Excel</span>
                 </button>
             </div>
         </header>
@@ -104,7 +93,7 @@
         </div>
 
         <main>
-            <!-- обзор -->
+            <!-- секция обзор -->
             <div id="section-overview" class="space-y-6">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div class="glass-card p-6 rounded-3xl">
@@ -117,87 +106,64 @@
                     </div>
                     <div class="glass-card p-6 rounded-3xl border-l-2 border-[#d9f99d]">
                         <div class="text-slate-500 text-[10px] font-bold uppercase mb-1 tracking-widest">баланс</div>
-                        <div id="val-balance" class="text-2xl font-bold">0 ₽</div>
+                        <div id="val-balance" class="text-2xl font-bold text-white">0 ₽</div>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div class="glass-card p-6 rounded-3xl h-[300px]"><canvas id="mainChart"></canvas></div>
                     <div class="glass-card p-6 rounded-3xl flex flex-col justify-center min-h-[150px]">
-                        <div id="category-bars" class="space-y-4"></div>
+                        <div id="category-bars" class="space-y-4 text-white"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- журнал -->
+            <!-- секция журнал -->
             <div id="section-transactions" class="hidden space-y-4">
                 <div class="no-print">
-                    <div class="relative w-full">
-                        <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500"></i>
-                        <input type="text" id="search-tx" oninput="window.renderTxList()" placeholder="поиск по названию или комментарию..." class="w-full bg-[#181a20] border border-white/5 rounded-xl py-3 pl-12 pr-4 outline-none focus:border-blue-500 text-sm">
-                    </div>
+                    <input type="text" id="search-tx" oninput="window.renderTxList()" placeholder="поиск по описанию или комментарию..." class="w-full bg-[#181a20] border border-white/5 rounded-xl py-3 px-4 outline-none focus:border-blue-500 text-sm text-white">
                 </div>
                 <div id="transactions-list" class="space-y-2"></div>
             </div>
 
-            <!-- статьи -->
-            <div id="section-categories" class="hidden max-w-xl mx-auto space-y-6">
-                <div class="glass-card p-6 rounded-3xl">
-                    <h3 class="text-lg font-bold mb-4">управление статьями</h3>
-                    <div class="flex gap-2 mb-6">
-                        <input type="text" id="new-cat-name" placeholder="название..." class="flex-1 bg-slate-900 border border-white/5 rounded-xl px-4 py-2 outline-none text-sm">
-                        <select id="new-cat-type" class="bg-slate-900 border border-white/5 rounded-xl px-4 py-2 outline-none text-sm">
-                            <option value="expense">расход</option>
-                            <option value="income">доход</option>
-                        </select>
-                        <button onclick="window.addCategory()" class="bg-blue-600 hover:bg-blue-500 px-4 rounded-xl transition-colors">
-                            <i data-lucide="plus" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-                    <div id="categories-grid" class="space-y-2"></div>
+            <!-- добавить -->
+            <div id="section-add" class="hidden max-w-xl mx-auto">
+                <div class="glass-card p-8 rounded-3xl">
+                    <h2 id="form-title" class="text-xl font-bold mb-6 text-white text-center">новая запись</h2>
+                    <form id="tx-form" class="space-y-4" onsubmit="window.handleFormSubmit(event)">
+                        <input type="text" id="tx-desc" required placeholder="описание (например: Оплата услуг)" class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none focus:border-blue-500 text-white">
+                        <div class="grid grid-cols-2 gap-4">
+                            <input type="number" id="tx-amount" required placeholder="сумма ₽" class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none text-white">
+                            <input type="date" id="tx-date" required class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none text-sm text-white">
+                        </div>
+                        <select id="tx-cat" class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none text-white"></select>
+                        <textarea id="tx-comment" rows="2" placeholder="комментарий" class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none text-sm resize-none text-white"></textarea>
+                        <input type="url" id="tx-link" placeholder="ссылка на документ (облако)" class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none text-sm text-white">
+                        <div class="flex gap-2 pt-4">
+                            <button type="button" id="cancel-edit" onclick="window.resetForm()" class="hidden flex-1 bg-slate-800 py-4 rounded-xl font-bold text-white transition-all active:scale-95">отмена</button>
+                            <button type="submit" id="submit-btn" class="flex-[2] bg-blue-600 hover:bg-blue-500 py-4 rounded-xl font-bold shadow-lg text-white transition-all active:scale-95">сохранить</button>
+                        </div>
+                    </form>
                 </div>
             </div>
 
-            <!-- добавить/править -->
-            <div id="section-add" class="hidden max-w-xl mx-auto">
-                <div class="glass-card p-8 rounded-3xl">
-                    <h2 id="form-title" class="text-xl font-bold mb-6">новая запись</h2>
-                    <form id="tx-form" class="space-y-4" onsubmit="window.handleFormSubmit(event)">
-                        <input type="text" id="tx-desc" required placeholder="что купили или получили?" class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none focus:border-blue-500">
-                        <div class="grid grid-cols-2 gap-4">
-                            <input type="number" id="tx-amount" required placeholder="сумма ₽" class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none">
-                            <input type="date" id="tx-date" required class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none text-sm">
-                        </div>
-                        <select id="tx-cat" class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none"></select>
-                        <textarea id="tx-comment" rows="2" placeholder="комментарий" class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none text-sm resize-none"></textarea>
-                        <input type="url" id="tx-link" placeholder="ссылка на документ (облако)" class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none text-sm">
-                        <div class="flex gap-2">
-                            <button type="button" id="cancel-edit" onclick="window.resetForm()" class="hidden flex-1 bg-slate-800 py-4 rounded-xl font-bold">отмена</button>
-                            <button type="submit" id="submit-btn" class="flex-[2] bg-blue-600 py-4 rounded-xl font-bold shadow-lg transition-all active:scale-95">сохранить</button>
-                        </div>
-                    </form>
+            <!-- статьи -->
+            <div id="section-categories" class="hidden max-w-xl mx-auto space-y-6 text-white">
+                <div class="glass-card p-6 rounded-3xl">
+                    <h3 class="text-lg font-bold mb-4">статьи</h3>
+                    <div class="flex gap-2 mb-6">
+                        <input type="text" id="new-cat-name" placeholder="название..." class="flex-1 bg-slate-900 border border-white/5 rounded-xl px-4 py-2 text-white outline-none">
+                        <select id="new-cat-type" class="bg-slate-900 border border-white/5 rounded-xl px-4 py-2 text-white">
+                            <option value="expense">расход</option>
+                            <option value="income">доход</option>
+                        </select>
+                        <button onclick="window.addCategory()" class="bg-blue-600 hover:bg-blue-500 px-4 rounded-xl transition-all active:scale-95"><i data-lucide="plus"></i></button>
+                    </div>
+                    <div id="categories-grid" class="space-y-2"></div>
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- экран ошибки/настройки для GitHub -->
-    <div id="setup-screen" class="hidden fixed inset-0 bg-slate-900 flex items-center justify-center p-6 z-[100]">
-        <div class="glass-card p-8 rounded-3xl max-w-md w-full text-center">
-            <div class="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <i data-lucide="cloud-off" class="w-8 h-8"></i>
-            </div>
-            <h2 class="text-xl font-bold mb-4">Нужна настройка Cloud</h2>
-            <p class="text-slate-400 text-sm mb-6 leading-relaxed">
-                Вы развернули приложение на GitHub. Чтобы данные сохранялись в облаке и работали на телефоне, нужно подключить ваш Firebase аккаунт.
-            </p>
-            <button onclick="window.useLocalStorage()" class="w-full bg-slate-800 hover:bg-slate-700 py-4 rounded-xl font-bold mb-3 transition-all">
-                Работать локально (без синхро)
-            </button>
-            <p class="text-[10px] text-slate-600 uppercase font-bold tracking-widest mt-4">или обратитесь к разработчику за ключами</p>
-        </div>
-    </div>
-
-    <!-- уведомления -->
     <div id="toast" class="fixed bottom-8 right-8 bg-white text-slate-900 px-6 py-3 rounded-full font-bold shadow-2xl transition-all opacity-0 translate-y-10 pointer-events-none z-50"></div>
 
     <script type="module">
@@ -205,7 +171,16 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc, updateDoc, deleteDoc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Глобальное состояние ---
+        // --- КОНФИГУРАЦИЯ ---
+        const manualConfig = {
+            apiKey: "AIzaSyDAehDfEYSjmHkiXEZs9oRJhNQ8bZkDbfo",
+            authDomain: "finatrack-6bdbd.firebaseapp.com",
+            projectId: "finatrack-6bdbd",
+            storageBucket: "finatrack-6bdbd.firebasestorage.app",
+            messagingSenderId: "610040806592",
+            appId: "1:610040806592:web:d5df1c50582e3181b04125"
+        };
+
         const state = {
             transactions: [],
             categories: [
@@ -213,24 +188,12 @@
                 { id: 'c2', name: 'Доход от клиента', type: 'income' },
                 { id: 'c3', name: 'Аренда / коворкинг', type: 'expense' }
             ],
-            user: null,
-            editingId: null,
-            chart: null,
-            selectedMonth: '',
-            isOffline: false
+            user: null, editingId: null, chart: null, isOffline: false,
+            appId: 'FinaTrack', // Установлено как название проекта
+            db: null, auth: null, selectedMonth: ''
         };
 
-        // Переменные Firebase
-        let app, auth, db, appId;
-
-        // --- Глобальные функции (для вызова из HTML) ---
-        window.useLocalStorage = () => {
-            document.getElementById('setup-screen').classList.add('hidden');
-            state.isOffline = true;
-            loadLocalData();
-            refreshUI();
-        };
-
+        // --- Глобальные функции ---
         window.switchTab = (id) => {
             ['overview', 'transactions', 'add', 'categories'].forEach(t => {
                 const sec = document.getElementById(`section-${t}`);
@@ -282,10 +245,9 @@
             if (!confirm('удалить операцию?')) return;
             if (state.isOffline) {
                 state.transactions = state.transactions.filter(t => t.id !== id);
-                saveLocalData();
-                refreshUI();
-            } else {
-                await deleteDoc(doc(db, `artifacts/${appId}/users/${state.user.uid}/transactions/${id}`));
+                saveLocal(); refreshUI();
+            } else if (state.db && state.user) {
+                await deleteDoc(doc(state.db, `artifacts/${state.appId}/users/${state.user.uid}/transactions/${id}`));
             }
             showToast('удалено');
         };
@@ -294,72 +256,23 @@
             const name = document.getElementById('new-cat-name').value;
             const type = document.getElementById('new-cat-type').value;
             if (!name) return;
-            state.categories.push({ id: 'c' + Date.now(), name, type });
-            if (state.isOffline) {
-                saveLocalData();
-            } else {
-                await setDoc(doc(db, `artifacts/${appId}/users/${state.user.uid}/settings/config`), { categories: state.categories });
+            const newCat = { id: 'c' + Date.now(), name, type };
+            state.categories.push(newCat);
+            if (state.isOffline) { saveLocal(); refreshUI(); }
+            else if (state.db && state.user) { 
+                await setDoc(doc(state.db, `artifacts/${state.appId}/users/${state.user.uid}/settings/config`), { categories: state.categories }); 
             }
             document.getElementById('new-cat-name').value = '';
-            populateCatDropdown();
-            renderCategoryGrid();
             showToast('статья добавлена');
         };
 
         window.deleteCategory = async (id) => {
             if (!confirm('удалить статью?')) return;
             state.categories = state.categories.filter(c => c.id !== id);
-            if (state.isOffline) {
-                saveLocalData();
-            } else {
-                await setDoc(doc(db, `artifacts/${appId}/users/${state.user.uid}/settings/config`), { categories: state.categories });
+            if (state.isOffline) { saveLocal(); refreshUI(); }
+            else if (state.db && state.user) { 
+                await setDoc(doc(state.db, `artifacts/${state.appId}/users/${state.user.uid}/settings/config`), { categories: state.categories }); 
             }
-            populateCatDropdown();
-            renderCategoryGrid();
-        };
-
-        window.renderTxList = () => {
-            const list = document.getElementById('transactions-list');
-            if (!list) return;
-            const search = document.getElementById('search-tx').value.toLowerCase();
-            let filtered = state.transactions;
-            if (state.selectedMonth) filtered = filtered.filter(t => t.date.startsWith(state.selectedMonth));
-            const txs = filtered.filter(t => 
-                t.desc.toLowerCase().includes(search) || (t.comment && t.comment.toLowerCase().includes(search))
-            ).sort((a,b) => b.date.localeCompare(a.date));
-            
-            if (txs.length === 0) {
-                list.innerHTML = '<div class="text-center py-12 text-slate-500 italic text-sm">нет операций</div>';
-                return;
-            }
-            list.innerHTML = txs.map(t => {
-                const cat = state.categories.find(c => c.id === t.catId) || { name: 'Прочее' };
-                return `<div class="glass-card p-4 rounded-2xl group transition-all hover:bg-[#1f222b]">
-                    <div class="flex items-start justify-between">
-                        <div class="flex items-start gap-4 min-w-0">
-                            <div class="w-10 h-10 mt-1 rounded-xl flex items-center justify-center shrink-0 ${t.type === 'income' ? 'bg-green-500/10 text-[#00f097]' : 'bg-red-500/10 text-[#ff4d8d]'}">
-                                <i data-lucide="${t.type === 'income' ? 'plus' : 'minus'}" class="w-4 h-4"></i>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <div class="font-bold text-sm text-white truncate">${t.desc}</div>
-                                <div class="text-[10px] text-slate-500 uppercase font-bold mt-0.5">${cat.name} • ${t.date}</div>
-                                ${t.comment ? `<div class="mt-2 text-[10px] text-slate-400 italic border-l border-white/10 pl-3">${t.comment}</div>` : ''}
-                                ${t.fileUrl ? `<a href="${t.fileUrl}" target="_blank" class="mt-2 inline-flex items-center gap-1 text-[10px] text-blue-400 font-bold uppercase"><i data-lucide="external-link" class="w-3 h-3"></i> ссылка</a>` : ''}
-                            </div>
-                        </div>
-                        <div class="flex flex-col items-end gap-2 ml-4 shrink-0">
-                            <span class="font-black ${t.type === 'income' ? 'text-[#00f097]' : 'text-[#ff4d8d]'} whitespace-nowrap">
-                                ${t.type === 'income' ? '+' : '-'}${Number(t.amount).toLocaleString()} ₽
-                            </span>
-                            <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                                <button onclick="window.editTx('${t.id}')" class="p-1.5 bg-slate-800 rounded-lg text-slate-500 hover:text-blue-400"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
-                                <button onclick="window.deleteTx('${t.id}')" class="p-1.5 bg-slate-800 rounded-lg text-slate-500 hover:text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-            }).join('');
-            lucide.createIcons();
         };
 
         window.handleFormSubmit = async (e) => {
@@ -372,39 +285,68 @@
                 date: document.getElementById('tx-date').value,
                 comment: document.getElementById('tx-comment').value,
                 fileUrl: document.getElementById('tx-link').value,
-                catId: catId,
-                type: cat ? cat.type : 'expense'
+                catId: catId, type: cat ? cat.type : 'expense'
             };
-
             if (state.editingId) {
-                if (state.isOffline) {
-                    const idx = state.transactions.findIndex(t => t.id === state.editingId);
-                    state.transactions[idx] = { ...state.transactions[idx], ...data };
-                } else {
-                    await updateDoc(doc(db, `artifacts/${appId}/users/${state.user.uid}/transactions/${state.editingId}`), data);
-                }
+                if (state.isOffline) { const i = state.transactions.findIndex(t => t.id === state.editingId); state.transactions[i] = {...state.transactions[i], ...data}; }
+                else { await updateDoc(doc(state.db, `artifacts/${state.appId}/users/${state.user.uid}/transactions/${state.editingId}`), data); }
             } else {
-                if (state.isOffline) {
-                    state.transactions.push({ id: Date.now().toString(), ...data, createdAt: Date.now() });
-                } else {
-                    await addDoc(collection(db, `artifacts/${appId}/users/${state.user.uid}/transactions`), { ...data, createdAt: Date.now() });
-                }
+                if (state.isOffline) { state.transactions.push({ id: Date.now().toString(), ...data, createdAt: Date.now() }); }
+                else { await addDoc(collection(state.db, `artifacts/${state.appId}/users/${state.user.uid}/transactions`), { ...data, createdAt: Date.now() }); }
             }
-            if (state.isOffline) saveLocalData();
-            window.resetForm();
-            window.switchTab('transactions');
-            showToast('сохранено');
+            if (state.isOffline) { saveLocal(); refreshUI(); }
+            window.resetForm(); window.switchTab('transactions'); showToast('сохранено');
+        };
+
+        window.renderTxList = () => {
+            const list = document.getElementById('transactions-list');
+            if (!list) return;
+            const search = document.getElementById('search-tx').value.toLowerCase();
+            let filtered = state.transactions;
+            if (state.selectedMonth) filtered = filtered.filter(t => t.date.startsWith(state.selectedMonth));
+            const txs = filtered.filter(t => t.desc.toLowerCase().includes(search) || (t.comment && t.comment.toLowerCase().includes(search))).sort((a,b) => b.date.localeCompare(a.date));
+            
+            if (txs.length === 0) {
+                list.innerHTML = '<div class="text-center py-12 text-slate-500 italic text-sm">нет данных</div>';
+                return;
+            }
+            list.innerHTML = txs.map(t => {
+                const cat = state.categories.find(c => c.id === t.catId) || { name: 'Прочее' };
+                return `<div class="glass-card p-4 rounded-2xl group mb-2 transition-all hover:bg-[#1f222b]">
+                    <div class="flex justify-between items-start">
+                        <div class="flex gap-4">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${t.type === 'income' ? 'bg-green-500/10 text-[#00f097]' : 'bg-red-500/10 text-[#ff4d8d]'}">
+                                <i data-lucide="${t.type === 'income' ? 'arrow-up' : 'arrow-down'}" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <div class="font-bold text-sm text-white">${t.desc}</div>
+                                <div class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">${cat.name} • ${t.date}</div>
+                                ${t.comment ? `<div class="mt-2 text-xs text-slate-400 italic">${t.comment}</div>` : ''}
+                                ${t.fileUrl ? `<a href="${t.fileUrl}" target="_blank" class="mt-2 inline-block text-[10px] text-blue-400 font-bold uppercase hover:underline">ссылка на документ</a>` : ''}
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-black ${t.type === 'income' ? 'text-[#00f097]' : 'text-[#ff4d8d]'}">${t.type === 'income' ? '+' : '-'}${Number(t.amount).toLocaleString()} ₽</div>
+                            <div class="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-all mt-1">
+                                <button onclick="window.editTx('${t.id}')" class="p-1 text-slate-500 hover:text-blue-400 transition-colors"><i data-lucide="edit-3" class="w-3 h-3"></i></button>
+                                <button onclick="window.deleteTx('${t.id}')" class="p-1 text-slate-500 hover:text-red-500 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+            lucide.createIcons();
         };
 
         window.exportToExcel = () => {
             const data = state.transactions.map(t => ({
-                'дата': t.date, 'описание': t.desc, 'категория': (state.categories.find(c => c.id === t.catId) || {}).name,
-                'сумма': t.amount, 'коммент': t.comment || ''
+                'дата': t.date, 'описание': t.desc, 'статья': (state.categories.find(c => c.id === t.catId) || {}).name,
+                'сумма': t.amount, 'тип': t.type === 'income' ? 'доход' : 'расход', 'коммент': t.comment || '', 'ссылка': t.fileUrl || ''
             }));
             const ws = XLSX.utils.json_to_sheet(data);
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Finances");
-            XLSX.writeFile(wb, "finatrack_report.xlsx");
+            XLSX.utils.book_append_sheet(wb, ws, "FinaTrack");
+            XLSX.writeFile(wb, `finatrack_export_${state.selectedMonth || 'all'}.xlsx`);
         };
 
         window.handleCsvImport = (input) => {
@@ -417,197 +359,123 @@
                     const parts = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
                     if (!parts || parts.length < 6) continue;
                     const clean = parts.map(p => p.replace(/^"|"$/g, '').trim());
-                    const [id, type_csv, date_csv, cat_name, desc_csv, amount_csv, tags_csv] = clean;
+                    const [id_csv, type_csv, date_csv, cat_name, desc_csv, amount_csv, tags_csv] = clean;
                     const type = type_csv.toLowerCase() === 'доход' ? 'income' : 'expense';
                     let cat = state.categories.find(c => c.name.toLowerCase() === cat_name.toLowerCase());
                     if (!cat) { cat = { id: 'c' + Date.now() + Math.random(), name: cat_name, type }; state.categories.push(cat); }
                     const tx = { desc: desc_csv, amount: Math.abs(parseFloat(amount_csv.replace(',', '.'))), date: date_csv, comment: tags_csv, catId: cat.id, type, createdAt: Date.now() };
-                    if (state.isOffline) { state.transactions.push({ id: Date.now().toString() + Math.random(), ...tx }); }
-                    else { await addDoc(collection(db, `artifacts/${appId}/users/${state.user.uid}/transactions`), tx); }
+                    if (state.isOffline) state.transactions.push({ id: Date.now().toString() + Math.random(), ...tx });
+                    else await addDoc(collection(state.db, `artifacts/${state.appId}/users/${state.user.uid}/transactions`), tx);
                 }
-                if (state.isOffline) saveLocalData();
-                showToast('импорт завершен');
-                refreshUI();
-                window.switchTab('transactions');
+                if (state.isOffline) saveLocal();
+                showToast('импорт завершен'); refreshUI(); window.switchTab('transactions');
             };
             reader.readAsText(file);
         };
 
-        // --- Инициализация ---
-        const setupApp = async () => {
-            try {
-                if (typeof __firebase_config === 'undefined' || !__firebase_config) {
-                    throw new Error("Missing config");
-                }
-                
-                const config = JSON.parse(__firebase_config);
-                appId = typeof __app_id !== 'undefined' ? __app_id : 'finatrack-fire-v6';
-                app = initializeApp(config);
-                auth = getAuth(app);
-                db = getFirestore(app);
-
-                // Слушатель только ПОСЛЕ создания объекта auth
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        state.user = user;
-                        startSync();
-                    }
-                });
-
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (err) {
-                console.warn("Firebase Init Failed - Switching to Offline Mode", err);
-                state.isOffline = true;
-                document.getElementById('setup-screen').classList.remove('hidden');
-            }
-            
-            document.getElementById('app-container').classList.remove('opacity-0');
-            lucide.createIcons();
-            
-            if (state.isOffline) {
-                loadLocalData();
-                refreshUI();
-            }
-        };
-
-        function startSync() {
-            if (!state.user || state.isOffline) return;
-            const uid = state.user.uid;
-            const baseRef = `artifacts/${appId}/users/${uid}`;
-            
-            onSnapshot(collection(db, baseRef, 'transactions'), (snap) => {
-                state.transactions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                refreshUI();
-                updateSyncIndicator('online');
-            }, (err) => updateSyncIndicator('error'));
-
-            onSnapshot(doc(db, baseRef, 'settings', 'config'), (snap) => {
-                if (snap.exists()) {
-                    state.categories = snap.data().categories || state.categories;
-                    populateCatDropdown();
-                    renderCategoryGrid();
-                } else {
-                    setDoc(doc(db, baseRef, 'settings', 'config'), { categories: state.categories });
-                }
-            });
-        }
-
-        // --- Внутренний UI ---
-        function loadLocalData() {
-            state.transactions = JSON.parse(localStorage.getItem('ft_offline_tx')) || [];
-            state.categories = JSON.parse(localStorage.getItem('ft_offline_cats')) || state.categories;
-            updateSyncIndicator('offline');
-        }
-
-        function saveLocalData() {
-            localStorage.setItem('ft_offline_tx', JSON.stringify(state.transactions));
-            localStorage.setItem('ft_offline_cats', JSON.stringify(state.categories));
-        }
-
+        // --- Внутренняя логика ---
+        function saveLocal() { localStorage.setItem('ft_off_tx', JSON.stringify(state.transactions)); localStorage.setItem('ft_off_cats', JSON.stringify(state.categories)); }
+        function loadLocal() { state.transactions = JSON.parse(localStorage.getItem('ft_off_tx')) || []; state.categories = JSON.parse(localStorage.getItem('ft_off_cats')) || state.categories; }
+        
         function refreshUI() {
-            updateStats();
-            window.renderTxList();
-            renderOverviewBars();
-            renderChart();
-            renderCategoryGrid();
-            populateCatDropdown();
-            lucide.createIcons();
+            updateStats(); window.renderTxList(); renderOverviewBars(); renderChart(); renderCategoryGrid(); populateCatDropdown();
         }
 
         function updateStats() {
             let filtered = state.transactions;
             if (state.selectedMonth) filtered = filtered.filter(t => t.date.startsWith(state.selectedMonth));
-            const inc = filtered.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
-            const exp = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
+            const inc = filtered.filter(t => t.type === 'income').reduce((s,t) => s + Number(t.amount), 0);
+            const exp = filtered.filter(t => t.type === 'expense').reduce((s,t) => s + Number(t.amount), 0);
             document.getElementById('val-income').innerText = `${inc.toLocaleString()} ₽`;
             document.getElementById('val-expense').innerText = `${exp.toLocaleString()} ₽`;
             document.getElementById('val-balance').innerText = `${(inc - exp).toLocaleString()} ₽`;
         }
 
         function renderCategoryGrid() {
-            const grid = document.getElementById('categories-grid');
-            if (!grid) return;
-            grid.innerHTML = state.categories.map(c => `<div class="flex items-center justify-between p-3 bg-slate-900/50 rounded-xl border border-white/5">
-                <div class="flex items-center gap-3 text-sm">
-                    <div class="w-2 h-2 rounded-full ${c.type === 'income' ? 'bg-[#00f097]' : 'bg-[#ff4d8d]'}"></div> ${c.name}
+            document.getElementById('categories-grid').innerHTML = state.categories.map(c => `
+                <div class="flex justify-between p-3 bg-slate-900/50 rounded-xl border border-white/5">
+                    <span class="text-sm font-medium">${c.name} (${c.type === 'income' ? 'доход' : 'расход'})</span>
+                    <button onclick="window.deleteCategory('${c.id}')" class="text-slate-600 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-4 h-4"></i></button>
                 </div>
-                <button onclick="window.deleteCategory('${c.id}')" class="text-slate-600 hover:text-red-500"><i data-lucide="x" class="w-4 h-4"></i></button>
-            </div>`).join('');
+            `).join('');
             lucide.createIcons();
         }
 
         function renderOverviewBars() {
             const container = document.getElementById('category-bars');
-            if (!container) return;
-            let filtered = state.transactions.filter(t => t.type === 'expense');
-            if (state.selectedMonth) filtered = filtered.filter(t => t.date.startsWith(state.selectedMonth));
+            const txs = state.transactions.filter(t => t.type === 'expense');
             const groups = {};
-            filtered.forEach(t => {
-                const cat = state.categories.find(c => c.id === t.catId) || { name: 'Прочее' };
-                groups[cat.name] = (groups[cat.name] || 0) + Number(t.amount);
-            });
-            const sorted = Object.entries(groups).sort((a,b) => b[1] - a[1]);
-            const total = sorted.reduce((s,v) => s + v[1], 0);
-            container.innerHTML = sorted.map(([name, val]) => {
-                const prc = total > 0 ? (val/total*100).toFixed(0) : 0;
-                return `<div class="space-y-1">
-                    <div class="flex justify-between text-[10px] font-bold uppercase text-slate-500">
-                        <span>${name}</span><span>${val.toLocaleString()} ₽ (${prc}%)</span>
-                    </div>
-                    <div class="h-1 bg-slate-800 rounded-full overflow-hidden"><div class="h-full bg-[#ff4d8d]" style="width: ${prc}%"></div></div>
-                </div>`;
+            txs.forEach(t => { const c = state.categories.find(cat => cat.id === t.catId) || {name:'Прочее'}; groups[c.name] = (groups[c.name] || 0) + Number(t.amount); });
+            const total = Object.values(groups).reduce((a,b) => a+b, 0);
+            container.innerHTML = Object.entries(groups).sort((a,b)=>b[1]-a[1]).map(([n, v]) => {
+                const p = total > 0 ? (v/total*100).toFixed(0) : 0;
+                return `<div class="space-y-1"><div class="flex justify-between text-[10px] text-slate-500 uppercase tracking-tighter"><span>${n}</span><span>${v.toLocaleString()} ₽ (${p}%)</span></div>
+                <div class="h-1 bg-slate-800 rounded-full overflow-hidden"><div class="h-full bg-[#ff4d8d]" style="width: ${p}%"></div></div></div>`;
             }).join('');
         }
 
         function renderChart() {
             const canvas = document.getElementById('mainChart');
-            if (!canvas) return;
             if (state.chart) state.chart.destroy();
-            let filtered = state.transactions;
-            if (state.selectedMonth) filtered = filtered.filter(t => t.date.startsWith(state.selectedMonth));
-            const txs = [...filtered].sort((a,b) => a.date.localeCompare(b.date));
-            const labels = [...new Set(txs.map(t => t.date))].slice(-14);
-            const incData = labels.map(d => txs.filter(t => t.date === d && t.type === 'income').reduce((s,t) => s + Number(t.amount), 0));
-            const expData = labels.map(d => txs.filter(t => d === t.date && t.type === 'expense').reduce((s,t) => s + Number(t.amount), 0));
+            const txs = [...state.transactions].sort((a,b) => a.date.localeCompare(b.date));
+            const labels = [...new Set(txs.map(t => t.date))].slice(-10);
+            const inc = labels.map(l => txs.filter(t => t.date === l && t.type === 'income').reduce((s,t)=>s+Number(t.amount), 0));
+            const exp = labels.map(l => txs.filter(t => t.date === l && t.type === 'expense').reduce((s,t)=>s+Number(t.amount), 0));
             state.chart = new Chart(canvas, {
                 type: 'line',
                 data: { labels, datasets: [
-                    { label: 'вх', data: incData, borderColor: '#00f097', tension: 0.4, borderWidth: 2, pointRadius: 0 },
-                    { label: 'исх', data: expData, borderColor: '#ff4d8d', tension: 0.4, borderWidth: 2, pointRadius: 0 }
+                    { label: 'вх', data: inc, borderColor: '#00f097', tension: 0.4, borderWidth: 2, pointRadius: 0 },
+                    { label: 'исх', data: exp, borderColor: '#ff4d8d', tension: 0.4, borderWidth: 2, pointRadius: 0 }
                 ]},
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
             });
         }
 
         function populateCatDropdown() {
-            const select = document.getElementById('tx-cat');
-            if (!select) return;
-            select.innerHTML = state.categories.map(c => `<option value="${c.id}">${c.name} (${c.type === 'income' ? 'доход' : 'расход'})</option>`).join('');
+            document.getElementById('tx-cat').innerHTML = state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
         }
 
         function updateSyncIndicator(mode) {
-            const dot = document.getElementById('sync-dot');
-            const txt = document.getElementById('sync-text');
-            if (!dot || !txt) return;
-            if (mode === 'online') { dot.className = 'w-1.5 h-1.5 rounded-full bg-[#00f097]'; txt.innerText = 'в сети'; txt.className = 'text-[#00f097]'; }
-            else if (mode === 'offline') { dot.className = 'w-1.5 h-1.5 rounded-full bg-orange-400'; txt.innerText = 'локально'; txt.className = 'text-orange-400'; }
-            else { dot.className = 'w-1.5 h-1.5 rounded-full bg-red-500'; txt.innerText = 'ошибка'; txt.className = 'text-red-500'; }
+            const d = document.getElementById('sync-dot'); const t = document.getElementById('sync-text');
+            if (mode === 'online') { d.className = 'w-1.5 h-1.5 rounded-full bg-[#00f097]'; t.innerText = 'в сети'; t.className = 'text-[#00f097]'; }
+            else { d.className = 'w-1.5 h-1.5 rounded-full bg-orange-400'; t.innerText = 'локально'; t.className = 'text-orange-400'; }
         }
 
-        function showToast(text) {
-            const t = document.getElementById('toast');
-            if (!t) return;
-            t.innerText = text;
-            t.classList.replace('opacity-0', 'opacity-100');
-            t.classList.replace('translate-y-10', 'translate-y-0');
-            setTimeout(() => { t.classList.replace('opacity-100', 'opacity-0'); t.classList.replace('translate-y-0', 'translate-y-10'); }, 3000);
-        }
+        function showToast(m) { const t = document.getElementById('toast'); t.innerText = m; t.classList.replace('opacity-0', 'opacity-100'); t.classList.replace('translate-y-10', 'translate-y-0'); setTimeout(() => { t.classList.replace('opacity-100', 'opacity-0'); t.classList.replace('translate-y-0', 'translate-y-10'); }, 3000); }
 
-        setupApp();
+        // --- Старт ---
+        const start = async () => {
+            try {
+                const config = (typeof __firebase_config !== 'undefined' && __firebase_config) ? JSON.parse(__firebase_config) : manualConfig;
+                if (!config.apiKey) throw "No Config";
+                
+                const app = initializeApp(config);
+                state.auth = getAuth(app); state.db = getFirestore(app);
+
+                onAuthStateChanged(state.auth, (user) => {
+                    if (user) {
+                        state.user = user;
+                        const base = `artifacts/${state.appId}/users/${user.uid}`;
+                        onSnapshot(collection(state.db, base, 'transactions'), (snap) => {
+                            state.transactions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                            refreshUI(); updateSyncIndicator('online');
+                        });
+                        onSnapshot(doc(state.db, base, 'settings', 'config'), (snap) => {
+                            if (snap.exists()) { state.categories = snap.data().categories || state.categories; refreshUI(); }
+                            else setDoc(doc(state.db, base, 'settings', 'config'), { categories: state.categories });
+                        });
+                    }
+                });
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(state.auth, __initial_auth_token);
+                else await signInAnonymously(state.auth);
+
+            } catch (err) {
+                state.isOffline = true; updateSyncIndicator('offline'); loadLocal(); refreshUI();
+            }
+        };
+
+        start();
         document.getElementById('tx-date').valueAsDate = new Date();
     </script>
 </body>
