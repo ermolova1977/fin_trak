@@ -20,6 +20,8 @@
             background-color: var(--bg-main); 
             color: #ffffff; 
             -webkit-tap-highlight-color: transparent; 
+            margin: 0;
+            padding: 0;
         }
         .tab-active { 
             background-color: #262933; 
@@ -37,9 +39,7 @@
             body { background: white; color: black; padding: 0; }
             .no-print { display: none !important; }
             .glass-card { border: none; box-shadow: none; background: white; color: black; }
-            .print-only { display: block !important; }
         }
-        .print-only { display: none; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
     </style>
 </head>
@@ -53,8 +53,8 @@
                     <span class="text-white">FINA</span><span class="text-slate-500">TRACK</span>
                 </span>
                 <div id="sync-indicator" class="flex items-center gap-2 px-3 py-1 bg-slate-800/50 rounded-full text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                    <div class="w-1.5 h-1.5 rounded-full bg-slate-600 animate-pulse"></div>
-                    синхронизация...
+                    <div id="sync-dot" class="w-1.5 h-1.5 rounded-full bg-slate-600 animate-pulse"></div>
+                    <span id="sync-text">подключение...</span>
                 </div>
             </div>
             <div class="flex items-center gap-2">
@@ -159,7 +159,7 @@
             <div id="section-add" class="hidden max-w-xl mx-auto">
                 <div class="glass-card p-8 rounded-3xl">
                     <h2 id="form-title" class="text-xl font-bold mb-6">новая запись</h2>
-                    <form id="tx-form" class="space-y-4">
+                    <form id="tx-form" class="space-y-4" onsubmit="handleFormSubmit(event)">
                         <input type="text" id="tx-desc" required placeholder="что купили или получили?" class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none focus:border-blue-500">
                         <div class="grid grid-cols-2 gap-4">
                             <input type="number" id="tx-amount" required placeholder="сумма ₽" class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none">
@@ -184,15 +184,16 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc, updateDoc, deleteDoc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase инициализация
         const firebaseConfig = JSON.parse(__firebase_config);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'finatrack-fire-v3';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'finatrack-fire-v4';
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
+        // Внутреннее состояние
         let state = {
             transactions: [],
             categories: [
@@ -206,50 +207,7 @@
             selectedMonth: ''
         };
 
-        // Auth
-        const initAuth = async () => {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                await signInAnonymously(auth);
-            }
-        };
-
-        onAuthStateChanged(auth, (user) => {
-            state.user = user;
-            if (user) {
-                startSync();
-            } else {
-                updateSyncIndicator('error');
-            }
-        });
-
-        function startSync() {
-            if (!state.user) return;
-            const uid = state.user.uid;
-            const baseRef = `artifacts/${appId}/users/${uid}`;
-            
-            // Синхронизация транзакций
-            onSnapshot(collection(db, baseRef, 'transactions'), (snap) => {
-                state.transactions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                refreshUI();
-                updateSyncIndicator('online');
-            }, () => updateSyncIndicator('error'));
-
-            // Синхронизация статей
-            onSnapshot(doc(db, baseRef, 'settings', 'config'), (snap) => {
-                if (snap.exists()) {
-                    state.categories = snap.data().categories || state.categories;
-                    populateCatDropdown();
-                    renderCategoryGrid();
-                } else {
-                    setDoc(doc(db, baseRef, 'settings', 'config'), { categories: state.categories });
-                }
-            });
-        }
-
-        // --- Глобальные функции (привязка к window для HTML) ---
-
+        // --- Глобальный экспорт функций для HTML ---
         window.switchTab = (id) => {
             ['overview', 'transactions', 'add', 'categories'].forEach(t => {
                 const sec = document.getElementById(`section-${t}`);
@@ -301,7 +259,8 @@
         window.deleteTx = async (id) => {
             if (!confirm('удалить операцию?')) return;
             try {
-                await deleteDoc(doc(db, `artifacts/${appId}/users/${state.user.uid}/transactions`, id));
+                const path = `artifacts/${appId}/users/${state.user.uid}/transactions/${id}`;
+                await deleteDoc(doc(db, path));
                 showToast('удалено');
             } catch (e) {
                 console.error(e);
@@ -313,7 +272,7 @@
             const type = document.getElementById('new-cat-type').value;
             if (!name || !state.user) return;
             const newCats = [...state.categories, { id: 'c' + Date.now(), name, type }];
-            await setDoc(doc(db, `artifacts/${appId}/users/${state.user.uid}`, 'settings', 'config'), { categories: newCats });
+            await setDoc(doc(db, `artifacts/${appId}/users/${state.user.uid}/settings/config`), { categories: newCats });
             document.getElementById('new-cat-name').value = '';
             showToast('статья добавлена');
         };
@@ -321,7 +280,7 @@
         window.deleteCategory = async (id) => {
             if (!confirm('удалить статью?')) return;
             const newCats = state.categories.filter(c => c.id !== id);
-            await setDoc(doc(db, `artifacts/${appId}/users/${state.user.uid}`, 'settings', 'config'), { categories: newCats });
+            await setDoc(doc(db, `artifacts/${appId}/users/${state.user.uid}/settings/config`), { categories: newCats });
         };
 
         window.renderTxList = () => {
@@ -377,7 +336,6 @@
         window.exportToExcel = () => {
             let filtered = state.transactions;
             if (state.selectedMonth) filtered = filtered.filter(t => t.date.startsWith(state.selectedMonth));
-            
             const data = filtered.map(t => ({
                 'дата': t.date, 'описание': t.desc, 'категория': (state.categories.find(c => c.id === t.catId) || {}).name,
                 'тип': t.type === 'income' ? 'доход' : 'расход', 'сумма': t.amount, 'коммент': t.comment || '', 'ссылка': t.fileUrl || ''
@@ -391,39 +349,29 @@
         window.handleCsvImport = (input) => {
             const file = input.files[0];
             if (!file || !state.user) return;
-
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const text = e.target.result;
                 const rows = text.split('\n').filter(row => row.trim().length > 0).slice(1);
-                
                 let count = 0;
                 for (const row of rows) {
                     const parts = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
                     if (!parts || parts.length < 6) continue;
-                    
                     const clean = parts.map(p => p.replace(/^"|"$/g, '').trim());
                     const [id, type_csv, date_csv, cat_name, desc_csv, amount_csv, tags_csv] = clean;
-                    
                     const type = type_csv.toLowerCase() === 'доход' ? 'income' : 'expense';
                     let cat = state.categories.find(c => c.name.toLowerCase() === cat_name.toLowerCase());
                     if (!cat) {
                         cat = { id: 'c' + Date.now() + Math.random(), name: cat_name, type };
                         state.categories.push(cat);
                     }
-                    
-                    await addDoc(collection(db, `artifacts/${appId}/users/${state.user.uid}`, 'transactions'), {
-                        desc: desc_csv,
-                        amount: Math.abs(parseFloat(amount_csv.replace(',', '.'))),
-                        date: date_csv,
-                        comment: tags_csv || 'импорт CSV',
-                        catId: cat.id,
-                        type,
-                        createdAt: Date.now()
+                    await addDoc(collection(db, `artifacts/${appId}/users/${state.user.uid}/transactions`), {
+                        desc: desc_csv, amount: Math.abs(parseFloat(amount_csv.replace(',', '.'))),
+                        date: date_csv, comment: tags_csv || 'импорт CSV', catId: cat.id, type, createdAt: Date.now()
                     });
                     count++;
                 }
-                await setDoc(doc(db, `artifacts/${appId}/users/${state.user.uid}`, 'settings', 'config'), { categories: state.categories });
+                await setDoc(doc(db, `artifacts/${appId}/users/${state.user.uid}/settings/config`), { categories: state.categories });
                 showToast(`импортировано: ${count}`);
                 input.value = '';
                 window.switchTab('transactions');
@@ -431,15 +379,33 @@
             reader.readAsText(file);
         };
 
-        // --- Внутренняя логика ---
+        window.handleFormSubmit = async (e) => {
+            e.preventDefault();
+            const catId = document.getElementById('tx-cat').value;
+            const cat = state.categories.find(c => c.id === catId);
+            const data = {
+                desc: document.getElementById('tx-desc').value,
+                amount: Math.abs(parseFloat(document.getElementById('tx-amount').value)),
+                date: document.getElementById('tx-date').value,
+                comment: document.getElementById('tx-comment').value,
+                fileUrl: document.getElementById('tx-link').value,
+                catId: catId,
+                type: cat ? cat.type : 'expense'
+            };
+            await saveTx(data);
+            window.resetForm();
+            window.switchTab('transactions');
+            showToast(state.editingId ? 'обновлено' : 'добавлено');
+        };
 
+        // --- Внутренняя логика ---
         async function saveTx(data) {
             if (!state.user) return;
-            const baseRef = `artifacts/${appId}/users/${state.user.uid}`;
+            const pathPrefix = `artifacts/${appId}/users/${state.user.uid}`;
             if (state.editingId) {
-                await updateDoc(doc(db, baseRef, 'transactions', state.editingId), data);
+                await updateDoc(doc(db, pathPrefix, 'transactions', state.editingId), data);
             } else {
-                await addDoc(collection(db, baseRef, 'transactions'), { ...data, createdAt: Date.now() });
+                await addDoc(collection(db, pathPrefix, 'transactions'), { ...data, createdAt: Date.now() });
             }
         }
 
@@ -453,10 +419,8 @@
         function updateStats() {
             let filtered = state.transactions;
             if (state.selectedMonth) filtered = filtered.filter(t => t.date.startsWith(state.selectedMonth));
-
             const inc = filtered.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
             const exp = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
-            
             document.getElementById('val-income').innerText = `${inc.toLocaleString()} ₽`;
             document.getElementById('val-expense').innerText = `${exp.toLocaleString()} ₽`;
             document.getElementById('val-balance').innerText = `${(inc - exp).toLocaleString()} ₽`;
@@ -482,7 +446,6 @@
             if (!container) return;
             let filtered = state.transactions;
             if (state.selectedMonth) filtered = filtered.filter(t => t.date.startsWith(state.selectedMonth));
-
             const txs = filtered.filter(t => t.type === 'expense');
             const groups = {};
             txs.forEach(t => {
@@ -506,10 +469,8 @@
             const canvas = document.getElementById('mainChart');
             if (!canvas) return;
             if (state.chart) state.chart.destroy();
-            
             let filtered = state.transactions;
             if (state.selectedMonth) filtered = filtered.filter(t => t.date.startsWith(state.selectedMonth));
-
             const txs = [...filtered].sort((a,b) => a.date.localeCompare(b.date));
             const labels = [...new Set(txs.map(t => t.date))].slice(-14);
             const incData = labels.map(d => txs.filter(t => t.date === d && t.type === 'income').reduce((s,t) => s + Number(t.amount), 0));
@@ -530,34 +491,18 @@
             select.innerHTML = state.categories.map(c => `<option value="${c.id}">${c.name} (${c.type === 'income' ? 'доход' : 'расход'})</option>`).join('');
         }
 
-        document.getElementById('tx-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const catId = document.getElementById('tx-cat').value;
-            const cat = state.categories.find(c => c.id === catId);
-            const data = {
-                desc: document.getElementById('tx-desc').value,
-                amount: Math.abs(parseFloat(document.getElementById('tx-amount').value)),
-                date: document.getElementById('tx-date').value,
-                comment: document.getElementById('tx-comment').value,
-                fileUrl: document.getElementById('tx-link').value,
-                catId: catId,
-                type: cat ? cat.type : 'expense'
-            };
-            await saveTx(data);
-            window.resetForm();
-            window.switchTab('transactions');
-            showToast(state.editingId ? 'обновлено' : 'добавлено');
-        });
-
         function updateSyncIndicator(mode) {
-            const el = document.getElementById('sync-indicator');
-            if (!el) return;
+            const el = document.getElementById('sync-dot');
+            const txt = document.getElementById('sync-text');
+            if (!el || !txt) return;
             if (mode === 'online') {
-                el.innerHTML = '<div class="w-1.5 h-1.5 rounded-full bg-[#00f097]"></div> в сети';
-                el.classList.replace('text-slate-500', 'text-[#00f097]');
+                el.className = 'w-1.5 h-1.5 rounded-full bg-[#00f097]';
+                txt.textContent = 'в сети';
+                txt.className = 'text-[#00f097]';
             } else {
-                el.innerHTML = '<div class="w-1.5 h-1.5 rounded-full bg-red-500"></div> ошибка';
-                el.classList.replace('text-[#00f097]', 'text-red-500');
+                el.className = 'w-1.5 h-1.5 rounded-full bg-red-500';
+                txt.textContent = 'ошибка';
+                txt.className = 'text-red-500';
             }
         }
 
@@ -573,7 +518,48 @@
             }, 3000);
         }
 
-        initAuth();
+        function startSync() {
+            if (!state.user) return;
+            const uid = state.user.uid;
+            const baseRef = `artifacts/${appId}/users/${uid}`;
+            
+            onSnapshot(collection(db, baseRef, 'transactions'), (snap) => {
+                state.transactions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                refreshUI();
+                updateSyncIndicator('online');
+            }, () => updateSyncIndicator('error'));
+
+            onSnapshot(doc(db, baseRef, 'settings', 'config'), (snap) => {
+                if (snap.exists()) {
+                    state.categories = snap.data().categories || state.categories;
+                    populateCatDropdown();
+                    renderCategoryGrid();
+                } else {
+                    setDoc(doc(db, baseRef, 'settings', 'config'), { categories: state.categories });
+                }
+            });
+        }
+
+        // Авторизация
+        const init = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (err) {
+                console.error("Auth failed:", err);
+                updateSyncIndicator('error');
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            state.user = user;
+            if (user) startSync();
+        });
+
+        init();
         document.getElementById('tx-date').valueAsDate = new Date();
     </script>
 </body>
