@@ -1,0 +1,531 @@
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinaTrack Pro - Расширенное управление</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Библиотека для экспорта в Excel -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --bg-main: #0f1115;
+            --bg-card: #181a20;
+            --accent-green: #00f097;
+            --accent-pink: #ff4d8d;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-main);
+            color: #ffffff;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .tab-active {
+            background-color: #262933;
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .glass-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        @media print {
+            body { background: white; color: black; padding: 0; }
+            .no-print { display: none !important; }
+            .glass-card { border: none; box-shadow: none; background: white; color: black; }
+            canvas { max-width: 100% !important; }
+            .print-only { display: block !important; }
+            .text-white { color: black !important; }
+            .text-slate-500 { color: #666 !important; }
+        }
+        .print-only { display: none; }
+    </style>
+</head>
+<body class="min-h-screen pb-10">
+
+    <div class="max-w-6xl mx-auto px-4 pt-6">
+        <!-- шапка приложения -->
+        <header class="flex flex-wrap justify-between items-center mb-8 gap-4 no-print">
+            <div class="flex items-center gap-2">
+                <span class="text-2xl font-black tracking-tighter uppercase italic">
+                    <span class="text-white">FINA</span><span class="text-slate-500">TRACK</span>
+                </span>
+            </div>
+            <div class="flex items-center gap-2 text-sm">
+                <button onclick="exportToExcel()" class="px-4 py-2 bg-slate-800/50 hover:bg-slate-800 rounded-full flex items-center gap-2 transition-colors">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4 text-green-500"></i>
+                    <span class="hidden sm:inline">Excel</span>
+                </button>
+                <button onclick="window.print()" class="px-4 py-2 bg-slate-800/50 hover:bg-slate-800 rounded-full flex items-center gap-2 transition-colors">
+                    <i data-lucide="printer" class="w-4 h-4 text-blue-400"></i>
+                    <span class="hidden sm:inline">Печать</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- навигация -->
+        <nav class="flex bg-[#181a20] p-1 rounded-2xl mb-8 overflow-x-auto no-print">
+            <button onclick="switchTab('overview')" id="tab-overview" class="tab-active flex-1 min-w-[100px] py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-medium transition-all">
+                <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Обзор
+            </button>
+            <button onclick="switchTab('transactions')" id="tab-transactions" class="flex-1 min-w-[100px] py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-medium text-slate-400 hover:text-white transition-all">
+                <i data-lucide="list" class="w-4 h-4"></i> Журнал
+            </button>
+            <button onclick="switchTab('categories')" id="tab-categories" class="flex-1 min-w-[100px] py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-medium text-slate-400 hover:text-white transition-all">
+                <i data-lucide="settings-2" class="w-4 h-4"></i> Статьи
+            </button>
+            <button onclick="switchTab('add')" id="tab-add" class="flex-1 min-w-[100px] py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-medium text-slate-400 hover:text-white transition-all">
+                <i data-lucide="plus" class="w-4 h-4"></i> Добавить
+            </button>
+        </nav>
+
+        <!-- фильтр периода -->
+        <div class="mb-6 flex items-center gap-4 no-print">
+            <div class="flex items-center gap-2 bg-[#181a20] px-4 py-2 rounded-xl border border-white/5">
+                <i data-lucide="calendar" class="w-4 h-4 text-slate-500"></i>
+                <input type="month" id="period-selector" onchange="updatePeriod()" class="bg-transparent border-none outline-none text-sm text-white font-bold cursor-pointer">
+            </div>
+            <div id="period-display" class="text-xs font-bold uppercase tracking-widest text-slate-500">
+                весь период
+            </div>
+        </div>
+
+        <!-- контент для печати (заголовок) -->
+        <div class="print-only mb-8">
+            <h1 class="text-2xl font-bold">Финансовый отчет FinaTrack</h1>
+            <p id="print-period-label">Период: все время</p>
+        </div>
+
+        <!-- секция: обзор -->
+        <div id="section-overview" class="space-y-8 animate-in fade-in duration-500">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="glass-card p-6 rounded-3xl relative overflow-hidden">
+                    <div class="text-slate-500 text-xs font-bold uppercase mb-2">Доходы за период</div>
+                    <div id="val-income" class="text-3xl font-bold text-[#00f097]">0 ₽</div>
+                </div>
+                <div class="glass-card p-6 rounded-3xl relative overflow-hidden">
+                    <div class="text-slate-500 text-xs font-bold uppercase mb-2">Расходы за период</div>
+                    <div id="val-expense" class="text-3xl font-bold text-[#ff4d8d]">0 ₽</div>
+                </div>
+                <div class="glass-card p-6 rounded-3xl border-l-4 border-l-[#d9f99d]">
+                    <div class="text-slate-500 text-xs font-bold uppercase mb-2">Чистый баланс</div>
+                    <div id="val-balance" class="text-3xl font-bold text-white">0 ₽</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="glass-card p-6 rounded-3xl">
+                    <h3 class="text-sm font-bold uppercase text-slate-500 mb-6 tracking-widest">Динамика</h3>
+                    <div class="h-[250px]">
+                        <canvas id="mainChart"></canvas>
+                    </div>
+                </div>
+                <div class="glass-card p-6 rounded-3xl">
+                    <h3 class="text-sm font-bold uppercase text-slate-500 mb-6 tracking-widest">Распределение</h3>
+                    <div id="category-bars" class="space-y-4">
+                        <!-- заполняется динамически -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- секция: журнал -->
+        <div id="section-transactions" class="hidden space-y-4 animate-in fade-in duration-500">
+            <div class="flex items-center justify-between no-print">
+                <h2 class="text-lg font-bold">Журнал операций</h2>
+                <div class="flex gap-2">
+                    <input type="text" id="search-tx" placeholder="Поиск..." class="bg-[#181a20] border border-white/5 rounded-xl px-4 py-2 text-sm outline-none focus:border-blue-500">
+                </div>
+            </div>
+            <div id="transactions-list" class="space-y-2">
+                <!-- карточки транзакций -->
+            </div>
+        </div>
+
+        <!-- секция: статьи (категории) -->
+        <div id="section-categories" class="hidden animate-in fade-in duration-500">
+            <div class="max-w-2xl mx-auto space-y-6">
+                <div class="glass-card p-6 rounded-3xl">
+                    <h3 class="text-lg font-bold mb-4">Управление статьями</h3>
+                    <div class="flex gap-2 mb-6">
+                        <input type="text" id="new-cat-name" placeholder="Название статьи..." class="flex-1 bg-slate-900 border border-white/5 rounded-xl px-4 py-2 outline-none">
+                        <select id="new-cat-type" class="bg-slate-900 border border-white/5 rounded-xl px-4 py-2 outline-none">
+                            <option value="expense">Расход</option>
+                            <option value="income">Доход</option>
+                        </select>
+                        <button onclick="addCategory()" class="bg-blue-600 hover:bg-blue-500 px-4 rounded-xl transition-colors">
+                            <i data-lucide="plus"></i>
+                        </button>
+                    </div>
+                    <div id="categories-grid" class="grid grid-cols-1 gap-2">
+                        <!-- список категорий -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- секция: добавить операцию -->
+        <div id="section-add" class="hidden animate-in fade-in duration-500 no-print">
+            <div class="glass-card p-8 rounded-3xl max-w-xl mx-auto">
+                <h2 class="text-xl font-bold mb-6">Новая запись</h2>
+                <form id="tx-form" class="space-y-5">
+                    <input type="text" id="tx-desc" required placeholder="Описание (напр. Продукты)" class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none focus:border-blue-500 transition-all">
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <input type="number" id="tx-amount" required placeholder="Сумма ₽" class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none focus:border-blue-500 transition-all">
+                        <input type="date" id="tx-date" required class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none focus:border-blue-500 transition-all text-xs md:text-sm">
+                    </div>
+
+                    <select id="tx-cat" class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none focus:border-blue-500 transition-all">
+                        <!-- опции категорий -->
+                    </select>
+
+                    <div class="space-y-3">
+                        <textarea id="tx-comment" rows="2" placeholder="Комментарий к операции..." class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none focus:border-blue-500 transition-all text-sm resize-none"></textarea>
+                        
+                        <div class="relative">
+                            <i data-lucide="link" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500"></i>
+                            <input type="url" id="tx-link" placeholder="Ссылка на файл (Google Drive, iCloud и др.)" class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 pl-12 pr-4 outline-none focus:border-blue-500 transition-all text-sm">
+                        </div>
+                    </div>
+
+                    <div class="relative">
+                        <label class="flex items-center gap-3 w-full bg-slate-900/50 border-2 border-dashed border-white/10 hover:border-blue-500/50 rounded-xl py-4 px-4 cursor-pointer transition-all group">
+                            <div class="p-2 bg-slate-800 rounded-lg text-slate-400 group-hover:text-blue-400">
+                                <i data-lucide="paperclip" class="w-5 h-5"></i>
+                            </div>
+                            <div class="flex-1">
+                                <div id="file-label" class="text-sm font-medium text-slate-400">Прикрепить название файла</div>
+                                <div class="text-[10px] text-slate-600">Для учета имен файлов</div>
+                            </div>
+                            <input type="file" id="tx-file" class="hidden" onchange="handleFileSelect(this)">
+                        </label>
+                    </div>
+
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-xl font-bold transition-all shadow-lg active:scale-95">
+                        Добавить в журнал
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- уведомление -->
+    <div id="toast" class="fixed bottom-8 right-8 bg-white text-slate-900 px-6 py-3 rounded-full font-bold shadow-2xl transition-all opacity-0 translate-y-10 pointer-events-none z-50"></div>
+
+    <script>
+        // начальное состояние данных
+        let db = {
+            transactions: JSON.parse(localStorage.getItem('ft_tx')) || [],
+            categories: JSON.parse(localStorage.getItem('ft_cats')) || [
+                { id: 'c1', name: 'Прочие расходы', type: 'expense' },
+                { id: 'c2', name: 'Доход от клиента', type: 'income' },
+                { id: 'c3', name: 'Аренда / коворкинг', type: 'expense' },
+                { id: 'c4', name: 'Еда и продукты', type: 'expense' }
+            ],
+            settings: {
+                selectedMonth: '' 
+            }
+        };
+
+        let chartInstance = null;
+        let selectedFileName = null;
+
+        window.onload = () => {
+            document.getElementById('tx-date').valueAsDate = new Date();
+            lucide.createIcons();
+            refreshUI();
+        };
+
+        function refreshUI() {
+            saveToStorage();
+            updateStats();
+            renderCategoryManager();
+            renderTxList();
+            renderOverviewBars();
+            renderChart();
+            populateCatDropdown();
+            lucide.createIcons();
+        }
+
+        function saveToStorage() {
+            localStorage.setItem('ft_tx', JSON.stringify(db.transactions));
+            localStorage.setItem('ft_cats', JSON.stringify(db.categories));
+        }
+
+        function switchTab(id) {
+            ['overview', 'transactions', 'categories', 'add'].forEach(t => {
+                document.getElementById(`section-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).classList.remove('tab-active');
+                document.getElementById(`tab-${t}`).classList.add('text-slate-400');
+            });
+            document.getElementById(`section-${id}`).classList.remove('hidden');
+            document.getElementById(`tab-${id}`).classList.add('tab-active');
+            document.getElementById(`tab-${id}`).classList.remove('text-slate-400');
+            lucide.createIcons();
+        }
+
+        function updatePeriod() {
+            db.settings.selectedMonth = document.getElementById('period-selector').value;
+            const label = db.settings.selectedMonth || 'весь период';
+            document.getElementById('period-display').textContent = label;
+            document.getElementById('print-period-label').textContent = `Период: ${label}`;
+            refreshUI();
+        }
+
+        function getFilteredTx() {
+            if (!db.settings.selectedMonth) return db.transactions;
+            return db.transactions.filter(t => t.date.startsWith(db.settings.selectedMonth));
+        }
+
+        function updateStats() {
+            const txs = getFilteredTx();
+            const inc = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+            const exp = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+            
+            document.getElementById('val-income').textContent = `${inc.toLocaleString()} ₽`;
+            document.getElementById('val-expense').textContent = `${exp.toLocaleString()} ₽`;
+            document.getElementById('val-balance').textContent = `${(inc - exp).toLocaleString()} ₽`;
+        }
+
+        function handleFileSelect(input) {
+            if (input.files && input.files[0]) {
+                selectedFileName = input.files[0].name;
+                document.getElementById('file-label').textContent = selectedFileName;
+                document.getElementById('file-label').classList.replace('text-slate-400', 'text-blue-400');
+            }
+        }
+
+        function addCategory() {
+            const name = document.getElementById('new-cat-name').value;
+            const type = document.getElementById('new-cat-type').value;
+            if (!name) return;
+            
+            db.categories.push({ id: Date.now().toString(), name, type });
+            document.getElementById('new-cat-name').value = '';
+            showToast('Статья добавлена');
+            refreshUI();
+        }
+
+        function deleteCategory(id) {
+            if (confirm('Удалить эту статью? Операции с ней останутся, но категория станет "Прочее"')) {
+                db.categories = db.categories.filter(c => c.id !== id);
+                refreshUI();
+            }
+        }
+
+        function renderCategoryManager() {
+            const grid = document.getElementById('categories-grid');
+            grid.innerHTML = db.categories.map(c => `
+                <div class="flex items-center justify-between p-3 bg-slate-900/50 rounded-xl border border-white/5">
+                    <div class="flex items-center gap-3">
+                        <div class="w-2 h-2 rounded-full ${c.type === 'income' ? 'bg-[#00f097]' : 'bg-[#ff4d8d]'}"></div>
+                        <span class="text-sm font-medium">${c.name}</span>
+                    </div>
+                    <button onclick="deleteCategory('${c.id}')" class="text-slate-600 hover:text-red-500 transition-colors">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function populateCatDropdown() {
+            const select = document.getElementById('tx-cat');
+            select.innerHTML = db.categories.map(c => `
+                <option value="${c.id}">${c.name} (${c.type === 'income' ? 'Доход' : 'Расход'})</option>
+            `).join('');
+        }
+
+        document.getElementById('tx-form').onsubmit = (e) => {
+            e.preventDefault();
+            const catId = document.getElementById('tx-cat').value;
+            const cat = db.categories.find(c => c.id === catId);
+            
+            const tx = {
+                id: Date.now(),
+                desc: document.getElementById('tx-desc').value,
+                amount: Math.abs(parseFloat(document.getElementById('tx-amount').value)),
+                date: document.getElementById('tx-date').value,
+                comment: document.getElementById('tx-comment').value,
+                fileUrl: document.getElementById('tx-link').value,
+                fileName: selectedFileName,
+                catId: catId,
+                type: cat ? cat.type : 'expense'
+            };
+            
+            db.transactions.push(tx);
+            e.target.reset();
+            selectedFileName = null;
+            document.getElementById('file-label').textContent = 'Прикрепить название файла';
+            document.getElementById('file-label').classList.replace('text-blue-400', 'text-slate-400');
+            document.getElementById('tx-date').valueAsDate = new Date();
+            showToast('Запись добавлена');
+            refreshUI();
+            switchTab('transactions');
+        };
+
+        function deleteTx(id) {
+            db.transactions = db.transactions.filter(t => t.id !== id);
+            refreshUI();
+        }
+
+        function renderTxList() {
+            const list = document.getElementById('transactions-list');
+            const search = document.getElementById('search-tx').value.toLowerCase();
+            const txs = getFilteredTx().filter(t => t.desc.toLowerCase().includes(search)).sort((a,b) => b.date.localeCompare(a.date));
+            
+            if (txs.length === 0) {
+                list.innerHTML = '<div class="text-center py-10 text-slate-500 italic">Операций не найдено</div>';
+                return;
+            }
+
+            list.innerHTML = txs.map(t => {
+                const cat = db.categories.find(c => c.id === t.catId) || { name: 'Прочее' };
+                return `
+                <div class="glass-card p-4 rounded-2xl group transition-all hover:bg-[#1f222b]">
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-start gap-4">
+                            <div class="w-10 h-10 mt-1 rounded-xl flex items-center justify-center ${t.type === 'income' ? 'bg-green-500/10 text-[#00f097]' : 'bg-red-500/10 text-[#ff4d8d]'}">
+                                <i data-lucide="${t.type === 'income' ? 'plus' : 'minus'}" class="w-4 h-4"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="font-bold text-sm text-white truncate">${t.desc}</div>
+                                <div class="text-[10px] text-slate-500 uppercase font-bold tracking-tighter mt-0.5">
+                                    ${cat.name} • ${t.date}
+                                </div>
+                                ${t.comment ? `<div class="mt-2 text-xs text-slate-400 italic font-medium border-l border-white/10 pl-3">${t.comment}</div>` : ''}
+                                
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    ${t.fileUrl ? `
+                                        <a href="${t.fileUrl}" target="_blank" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded text-[10px] font-bold transition-colors">
+                                            <i data-lucide="external-link" class="w-3 h-3"></i> Ссылка
+                                        </a>
+                                    ` : ''}
+                                    ${t.fileName ? `
+                                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-yellow-500/10 text-yellow-500 rounded text-[10px] font-bold">
+                                            <i data-lucide="paperclip" class="w-3 h-3"></i> ${t.fileName}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end gap-3 ml-4">
+                            <span class="font-black ${t.type === 'income' ? 'text-[#00f097]' : 'text-[#ff4d8d]'} whitespace-nowrap">
+                                ${t.type === 'income' ? '+' : '-'}${t.amount.toLocaleString()} ₽
+                            </span>
+                            <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                <button onclick="deleteTx(${t.id})" class="no-print p-1.5 bg-slate-800/50 hover:bg-red-900/30 rounded-lg text-slate-500 hover:text-red-500 transition-all">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function renderOverviewBars() {
+            const container = document.getElementById('category-bars');
+            const txs = getFilteredTx().filter(t => t.type === 'expense');
+            const groups = {};
+            
+            txs.forEach(t => {
+                const catName = (db.categories.find(c => c.id === t.catId) || {name: 'Прочее'}).name;
+                groups[catName] = (groups[catName] || 0) + t.amount;
+            });
+
+            const sorted = Object.entries(groups).sort((a,b) => b[1] - a[1]);
+            const total = sorted.reduce((s, v) => s + v[1], 0);
+
+            container.innerHTML = sorted.map(([name, val]) => {
+                const prc = total > 0 ? (val / total * 100).toFixed(0) : 0;
+                return `
+                <div class="space-y-1">
+                    <div class="flex justify-between text-[10px] font-bold uppercase text-slate-400">
+                        <span>${name}</span>
+                        <span>${val.toLocaleString()} ₽ (${prc}%)</span>
+                    </div>
+                    <div class="h-1 bg-slate-800 rounded-full overflow-hidden">
+                        <div class="h-full bg-[#ff4d8d]" style="width: ${prc}%"></div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function renderChart() {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+            
+            const txs = getFilteredTx().sort((a,b) => a.date.localeCompare(b.date));
+            const labels = [...new Set(txs.map(t => t.date))];
+            
+            const incData = labels.map(d => txs.filter(t => t.date === d && t.type === 'income').reduce((s, t) => s + t.amount, 0));
+            const expData = labels.map(d => txs.filter(t => d === t.date && t.type === 'expense').reduce((s, t) => s + t.amount, 0));
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'Доходы', data: incData, borderColor: '#00f097', tension: 0.4, borderWidth: 2, pointRadius: 0 },
+                        { label: 'Расходы', data: expData, borderColor: '#ff4d8d', tension: 0.4, borderWidth: 2, pointRadius: 0 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { ticks: { color: '#475569', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.03)' } }
+                    }
+                }
+            });
+        }
+
+        function exportToExcel() {
+            const txs = getFilteredTx().map(t => ({
+                'Дата': t.date,
+                'Описание': t.desc,
+                'Категория': (db.categories.find(c => c.id === t.catId) || {name: 'Прочее'}).name,
+                'Тип': t.type === 'income' ? 'Доход' : 'Расход',
+                'Сумма (₽)': t.amount,
+                'Комментарий': t.comment || '',
+                'Ссылка': t.fileUrl || '',
+                'Имя файла': t.fileName || ''
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(txs);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Транзакции");
+            XLSX.writeFile(wb, `FinaTrack_Pro_Report_${db.settings.selectedMonth || 'Full'}.xlsx`);
+            showToast('Файл Excel создан');
+        }
+
+        function showToast(text) {
+            const t = document.getElementById('toast');
+            t.textContent = text;
+            t.classList.replace('opacity-0', 'opacity-100');
+            t.classList.replace('translate-y-10', 'translate-y-0');
+            setTimeout(() => {
+                t.classList.replace('opacity-100', 'opacity-0');
+                t.classList.replace('translate-y-0', 'translate-y-10');
+            }, 3000);
+        }
+
+        document.getElementById('search-tx').oninput = renderTxList;
+
+    </script>
+</body>
+</html>
