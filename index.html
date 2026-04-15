@@ -184,7 +184,7 @@
         <!-- секция: добавить операцию -->
         <div id="section-add" class="hidden animate-in fade-in duration-500 no-print">
             <div class="glass-card p-8 rounded-3xl max-w-xl mx-auto">
-                <h2 class="text-xl font-bold mb-6">Новая запись</h2>
+                <h2 id="form-title" class="text-xl font-bold mb-6">Новая запись</h2>
                 <form id="tx-form" class="space-y-5">
                     <input type="text" id="tx-desc" required placeholder="Описание (напр. Продукты)" class="w-full bg-slate-900 border border-white/5 rounded-xl py-3 px-4 outline-none focus:border-blue-500 transition-all">
                     
@@ -219,9 +219,14 @@
                         </label>
                     </div>
 
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-xl font-bold transition-all shadow-lg active:scale-95">
-                        Добавить в журнал
-                    </button>
+                    <div class="flex gap-4">
+                        <button type="button" id="cancel-edit" onclick="resetForm()" class="hidden flex-1 bg-slate-800 hover:bg-slate-700 py-4 rounded-xl font-bold transition-all active:scale-95">
+                            Отмена
+                        </button>
+                        <button type="submit" id="submit-btn" class="flex-[2] bg-blue-600 hover:bg-blue-500 py-4 rounded-xl font-bold transition-all shadow-lg active:scale-95">
+                            Добавить в журнал
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
@@ -247,6 +252,7 @@
 
         let chartInstance = null;
         let selectedFileName = null;
+        let editingId = null;
 
         window.onload = () => {
             document.getElementById('tx-date').valueAsDate = new Date();
@@ -326,25 +332,20 @@
                 
                 let importedCount = 0;
                 rows.forEach(row => {
-                    // Регулярное выражение для корректного разбиения CSV (учитывая кавычки)
                     const parts = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
                     if (!parts || parts.length < 6) return;
                     
-                    // Очистка от кавычек
                     const clean = parts.map(p => p.replace(/^"|"$/g, '').trim());
-                    // ID, Тип, Дата, Категория, Описание, Сумма, Теги, Файлов
                     const [id_csv, type_csv, date_csv, cat_name, desc_csv, amount_csv, tags_csv, files_count] = clean;
                     
                     const type = type_csv.toLowerCase() === 'доход' ? 'income' : 'expense';
                     
-                    // Ищем или создаем категорию
                     let category = db.categories.find(c => c.name.toLowerCase() === cat_name.toLowerCase());
                     if (!category) {
                         category = { id: 'c' + Date.now() + Math.random(), name: cat_name, type: type };
                         db.categories.push(category);
                     }
                     
-                    // Создаем транзакцию
                     const tx = {
                         id: Date.now() + Math.random(),
                         desc: desc_csv,
@@ -360,7 +361,7 @@
                     importedCount++;
                 });
 
-                input.value = ''; // Сброс инпута
+                input.value = '';
                 refreshUI();
                 showToast(`Импортировано операций: ${importedCount}`);
                 switchTab('transactions');
@@ -408,13 +409,53 @@
             `).join('');
         }
 
+        // Редактирование операции
+        function editTx(id) {
+            const tx = db.transactions.find(t => t.id === id);
+            if (!tx) return;
+
+            editingId = id;
+            document.getElementById('form-title').textContent = 'Редактирование записи';
+            document.getElementById('submit-btn').textContent = 'Сохранить изменения';
+            document.getElementById('cancel-edit').classList.remove('hidden');
+
+            document.getElementById('tx-desc').value = tx.desc;
+            document.getElementById('tx-amount').value = tx.amount;
+            document.getElementById('tx-date').value = tx.date;
+            document.getElementById('tx-comment').value = tx.comment || '';
+            document.getElementById('tx-link').value = tx.fileUrl || '';
+            
+            selectedFileName = tx.fileName;
+            if (selectedFileName) {
+                document.getElementById('file-label').textContent = selectedFileName;
+                document.getElementById('file-label').classList.replace('text-slate-400', 'text-blue-400');
+            } else {
+                document.getElementById('file-label').textContent = 'Прикрепить название файла';
+                document.getElementById('file-label').classList.replace('text-blue-400', 'text-slate-400');
+            }
+
+            document.getElementById('tx-cat').value = tx.catId;
+            switchTab('add');
+        }
+
+        function resetForm() {
+            editingId = null;
+            document.getElementById('tx-form').reset();
+            document.getElementById('form-title').textContent = 'Новая запись';
+            document.getElementById('submit-btn').textContent = 'Добавить в журнал';
+            document.getElementById('cancel-edit').classList.add('hidden');
+            document.getElementById('file-label').textContent = 'Прикрепить название файла';
+            document.getElementById('file-label').classList.replace('text-blue-400', 'text-slate-400');
+            document.getElementById('tx-date').valueAsDate = new Date();
+            selectedFileName = null;
+        }
+
         document.getElementById('tx-form').onsubmit = (e) => {
             e.preventDefault();
             const catId = document.getElementById('tx-cat').value;
             const cat = db.categories.find(c => c.id === catId);
             
-            const tx = {
-                id: Date.now(),
+            const txData = {
                 desc: document.getElementById('tx-desc').value,
                 amount: Math.abs(parseFloat(document.getElementById('tx-amount').value)),
                 date: document.getElementById('tx-date').value,
@@ -424,21 +465,30 @@
                 catId: catId,
                 type: cat ? cat.type : 'expense'
             };
+
+            if (editingId) {
+                const index = db.transactions.findIndex(t => t.id === editingId);
+                if (index !== -1) {
+                    db.transactions[index] = { ...db.transactions[index], ...txData };
+                    showToast('Изменения сохранены');
+                }
+            } else {
+                const tx = { id: Date.now(), ...txData };
+                db.transactions.push(tx);
+                showToast('Запись добавлена');
+            }
             
-            db.transactions.push(tx);
-            e.target.reset();
-            selectedFileName = null;
-            document.getElementById('file-label').textContent = 'Прикрепить название файла';
-            document.getElementById('file-label').classList.replace('text-blue-400', 'text-slate-400');
-            document.getElementById('tx-date').valueAsDate = new Date();
-            showToast('Запись добавлена');
+            resetForm();
             refreshUI();
             switchTab('transactions');
         };
 
         function deleteTx(id) {
-            db.transactions = db.transactions.filter(t => t.id !== id);
-            refreshUI();
+            if (confirm('Удалить эту операцию?')) {
+                db.transactions = db.transactions.filter(t => t.id !== id);
+                refreshUI();
+                showToast('Операция удалена');
+            }
         }
 
         function renderTxList() {
@@ -486,6 +536,9 @@
                                 ${t.type === 'income' ? '+' : '-'}${t.amount.toLocaleString()} ₽
                             </span>
                             <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                <button onclick="editTx(${t.id})" class="no-print p-1.5 bg-slate-800/50 hover:bg-blue-900/30 rounded-lg text-slate-500 hover:text-blue-400 transition-all">
+                                    <i data-lucide="edit-3" class="w-4 h-4"></i>
+                                </button>
                                 <button onclick="deleteTx(${t.id})" class="no-print p-1.5 bg-slate-800/50 hover:bg-red-900/30 rounded-lg text-slate-500 hover:text-red-500 transition-all">
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                 </button>
